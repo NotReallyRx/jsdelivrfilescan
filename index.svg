@@ -1,63 +1,145 @@
 <svg xmlns="http://www.w3.org/2000/svg"
      xmlns:xhtml="http://www.w3.org/1999/xhtml"
      width="100%"
-     height="100%"
-     viewBox="0 0 100 100">
+     height="100%">
 
-  <foreignObject x="0" y="0" width="100" height="100">
-    <xhtml:div id="app"
-      style="width:100%;height:100%;overflow:auto;">
-      Loading...
+  <foreignObject x="0" y="0" width="100%" height="100%">
+    <xhtml:div
+      style="
+        width:100%;
+        height:100%;
+        margin:0;
+        padding:0;
+        overflow:auto;
+      ">
+
+      <xhtml:pre
+        id="output"
+        style="
+          width:100%;
+          height:100%;
+          box-sizing:border-box;
+          margin:0;
+          padding:20px;
+          overflow:auto;
+          white-space:pre-wrap;
+          word-break:break-word;
+          font-family:monospace;
+        ">Loading…</xhtml:pre>
+
     </xhtml:div>
   </foreignObject>
 
   <script><![CDATA[
-    (async () => {
-      const app = document.getElementById("app");
+    const ROOT =
+      "https://cdn.jsdelivr.net/gh/NotReallyRx/bocchi@main/a/html/";
 
-      try {
-        const response = await fetch(
-          "https://cdn.jsdelivr.net/gh/NotReallyRx/jsdelivrfilescan@main/index.html"
+    const output =
+      document.getElementById("output");
+
+    async function getLinks(url) {
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(
+          response.status + " " +
+          response.statusText + ": " + url
+        );
+      }
+
+      const html = await response.text();
+
+      const doc =
+        new DOMParser().parseFromString(
+          html,
+          "text/html"
         );
 
-        if (!response.ok) {
-          throw new Error(
-            response.status + " " + response.statusText
-          );
-        }
+      return [...doc.querySelectorAll("a[href]")]
+        .map(a => a.href)
+        .filter(Boolean);
+    }
 
-        const html = await response.text();
+    async function scan() {
+      const queue = [ROOT];
+      const visited = new Set();
+      const files = [];
 
-        // Parse the fetched HTML.
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, "text/html");
+      const rootUrl = new URL(ROOT);
 
-        // Copy the fetched page into the SVG's page.
-        app.innerHTML = "";
+      while (queue.length) {
+        const directory = queue.shift();
 
-        for (const node of [...doc.body.childNodes]) {
-          app.appendChild(
-            document.importNode(node, true)
-          );
-        }
+        if (visited.has(directory)) continue;
 
-        // Re-run scripts from the fetched HTML.
-        for (const script of [...app.querySelectorAll("script")]) {
-          const newScript = document.createElement("script");
+        visited.add(directory);
 
-          if (script.src) {
-            newScript.src = script.src;
-          } else {
-            newScript.textContent = script.textContent;
+        const links = await getLinks(directory);
+
+        for (const link of links) {
+          const url = new URL(link);
+
+          url.search = "";
+          url.hash = "";
+
+          if (
+            url.origin !== rootUrl.origin ||
+            !url.pathname.startsWith(rootUrl.pathname)
+          ) {
+            continue;
           }
 
-          script.replaceWith(newScript);
+          if (url.href === directory) continue;
+
+          const relativePath =
+            decodeURIComponent(
+              url.pathname.slice(
+                rootUrl.pathname.length
+              )
+            );
+
+          if (!relativePath) continue;
+
+          if (relativePath.endsWith("/")) {
+            if (!visited.has(url.href)) {
+              queue.push(url.href);
+            }
+          } else {
+            files.push(relativePath);
+          }
         }
+      }
+
+      return [...new Set(files)].sort();
+    }
+
+    async function main() {
+      try {
+        const files = await scan();
+
+        output.textContent = JSON.stringify({
+          repository: "NotReallyRx/bocchi",
+          root: "a/html",
+          count: files.length,
+          files
+        }, null, 2);
+
+        window.fileIndex = {
+          repository: "NotReallyRx/bocchi",
+          root: "a/html",
+          count: files.length,
+          files
+        };
 
       } catch (error) {
-        app.textContent = "Error: " + error.message;
+        output.textContent =
+          JSON.stringify({
+            error: error.message
+          }, null, 2);
       }
-    })();
+    }
+
+    main();
   ]]></script>
 
 </svg>
