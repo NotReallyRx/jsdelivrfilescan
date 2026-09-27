@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xhtml="http://www.w3.org/1999/xhtml"
+     width="100%"
+     height="100%"
+     viewBox="0 0 100 100">
+
+  <foreignObject x="0" y="0" width="100" height="100">
+    <xhtml:div id="app"
+      style="width:100%;height:100%;overflow:auto;">
+      Loading...
+    </xhtml:div>
+  </foreignObject>
+
+  <script><![CDATA[
+    (async () => {
+      const app = document.getElementById("app");
+
+      try {
+        const response = await fetch(
+          "https://cdn.jsdelivr.net/gh/NotReallyRx/jsdelivrfilescan@main/index.html"
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            response.status + " " + response.statusText
+          );
+        }
+
+        const html = await response.text();
+
+        // Parse the fetched HTML.
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+
+        // Copy the fetched page into the SVG's page.
+        app.innerHTML = "";
+
+        for (const node of [...doc.body.childNodes]) {
+          app.appendChild(
+            document.importNode(node, true)
+          );
+        }
+
+        // Re-run scripts from the fetched HTML.
+        for (const script of [...app.querySelectorAll("script")]) {
+          const newScript = document.createElement("script");
+
+          if (script.src) {
+            newScript.src = script.src;
+          } else {
+            newScript.textContent = script.textContent;
+          }
+
+          script.replaceWith(newScript);
+        }
+
+      } catch (error) {
+        app.textContent = "Error: " + error.message;
+      }
+    })();
+  ]]></script>
+
+</svg>
